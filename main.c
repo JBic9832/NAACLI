@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "sqlite3.h"
+
 // Include the platform specific header file for cwd check
 #if defined (_WIN32)
 #include <direct.h>
@@ -57,10 +59,11 @@ void print_help_screen(CLI_Info info) {
     printf("\tJoseph Bickford\n");
 }
 
-int process_args(int argc, char* argv[], CLI_Info info) {
+// Refactor for getopt once functionality is fleshed out
+int process_args(int argc, char* argv[], char* cwd_path, CLI_Info info) {
     // The user did not supply any arguments
     if (argc <= 1) {
-        printf("No arguments supplied!");
+        printf("No arguments supplied!\n");
         // Show the user how to use the app to avoid further confusion
         print_help_screen(info);    
         return -1;
@@ -78,12 +81,20 @@ int process_args(int argc, char* argv[], CLI_Info info) {
 int main(int argc, char *argv[]) {
     char buffer[PATH_SIZE];
     char* cwd_path = "";
-    if (_getcwd(buffer, sizeof(buffer)) != NULL) {
-        cwd_path = buffer;
-    } else {
-        printf("ERROR: Could not get CWD");
+
+    #if defined (_WIN32)
+    if (_getcwd(buffer, sizeof(buffer)) == NULL) {
+        printf("Could not get CWD!");
         return -1;
     }
+    #else
+    if (getcwd(buffer, sizeof(buffer)) == NULL) {
+        printf("Could not get CWD!");
+        return -1;
+    }
+    #endif
+
+    cwd_path = buffer;
 
     Arg arg0 = {
         "Category",
@@ -108,5 +119,5 @@ int main(int argc, char *argv[]) {
         2
     };
 
-    return process_args(argc, argv, app_info);
+    return process_args(argc, argv, cwd_path, app_info);
 }
