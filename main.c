@@ -1,15 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 
 #include "sqlite3.h"
 
 // Include the platform specific header file for cwd check
 #if defined (_WIN32)
 #include <direct.h>
+#define PATH_SIZE _MAX_PATH
 #else
 #include <unistd.h>
+#include <limits.h>
+#define PATH_SIZE PATH_MAX
 #endif
 
 typedef struct {
@@ -25,38 +27,44 @@ typedef struct {
     const int num_arguments;
 } CLI_Info;
 
-int open_db(sqlite3* db, const char* cwd) {
-	char buffer[PATH_MAX];
-	sprintf(buffer, "%s/notes.db", cwd);
-	int res = sqlite3_open(buffer, &db);
-	if(res) {
-		fprintf(stderr, "ERROR: Failed to open db connection!");
-		return res;
-	}
-
-	return 0;
+unsigned int hash(const char *str) {
+    unsigned int hash = 5381;
+    while (*str) {
+        hash = ((hash << 5) + hash) + *str++; // hash * 33 + c
+    }
+    return hash;
 }
 
-int create_entry(sqlite3* db, const char* category, const char* content) {
+void open_db(sqlite3** db, const char* cwd) {
+	char buffer[PATH_SIZE];
+	sprintf(buffer, "%s/notes.db", cwd);
+	int res = sqlite3_open(buffer, db);
+	if(res) {
+		fprintf(stderr, "ERROR: Failed to open db connection!");
+	}
+
+}
+
+int create_entry(sqlite3** db, const char* category, const char* content) {
 	int res;
 
 	char create_table_buffer[512];
 	snprintf(create_table_buffer, sizeof(create_table_buffer), "CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY, content TEXT)", category);
 
 	const char* sql = create_table_buffer;
+	printf("%p\n", db);
 
 	char* error_message = 0;
-	res = sqlite3_exec(db, sql, 0, 0, &error_message);
+	res = sqlite3_exec(*db, sql, NULL, NULL, &error_message);
 	if (res != SQLITE_OK) {
 		fprintf(stderr, "ERROR: Failed to create table %s: %s - %s\n", category, error_message, sqlite3_errstr(res));
 		sqlite3_free(error_message);
-		return -1;
 	}
 
 	sqlite3_stmt* create_stmt;
 	char create_entry_buffer[1024];
 	sprintf(create_entry_buffer, "INSERT INTO %s (content) VALUES (%s)", category, content);
-	res = sqlite3_prepare_v2(db, create_entry_buffer, -1, &create_stmt, 0);
+	res = sqlite3_prepare_v2(*db, create_entry_buffer, -1, &create_stmt, 0);
 	if (res != SQLITE_OK) {
 		fprintf(stderr, "ERROR: Could not create entry in %s\n", category);
 		return -1;
@@ -68,9 +76,9 @@ int create_entry(sqlite3* db, const char* category, const char* content) {
 
 int handle_db_create_entry(const char* category, const char* content, const char* cwd) {
 	sqlite3* db;
-	open_db(db, cwd);
+	open_db(&db, cwd);
 
-	create_entry(db, category, content);
+	create_entry(&db, category, content);
 
 	sqlite3_close(db);
 	return 0;
@@ -153,7 +161,7 @@ int process_input(int argc, char* argv[], const char* cwd_path, CLI_Info info) {
 }
 
 int main(int argc, char *argv[]) {
-    char buffer[PATH_MAX];
+    char buffer[PATH_SIZE];
     char* cwd_path = "";
 
     #if defined (_WIN32)
