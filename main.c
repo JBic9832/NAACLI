@@ -49,10 +49,11 @@ int create_entry(sqlite3** db, const char* category, const char* content) {
 	int res;
 
 	char create_table_buffer[512];
-	snprintf(create_table_buffer, sizeof(create_table_buffer), "CREATE TABLE IF NOT EXISTS %s (id INTEGER PRIMARY KEY, content TEXT)", category);
+	snprintf(create_table_buffer, sizeof(create_table_buffer), "CREATE TABLE IF NOT EXISTS %s (ID INTEGER PRIMARY KEY, CONTENT TEXT NOT NULL)", category);
 
 	const char* sql = create_table_buffer;
-	printf("%p\n", db);
+
+	printf("Category: %s, Content: %s\n", category, content);
 
 	char* error_message = 0;
 	res = sqlite3_exec(*db, sql, NULL, NULL, &error_message);
@@ -62,13 +63,21 @@ int create_entry(sqlite3** db, const char* category, const char* content) {
 	}
 
 	sqlite3_stmt* create_stmt;
-	char create_entry_buffer[1024];
-	sprintf(create_entry_buffer, "INSERT INTO %s (content) VALUES (%s)", category, content);
-	res = sqlite3_prepare_v2(*db, create_entry_buffer, -1, &create_stmt, 0);
+	char query_buffer[512];
+	snprintf(query_buffer, sizeof(query_buffer), "INSERT INTO %s (CONTENT) VALUES (\"%s\")", category, content);
+	res = sqlite3_prepare_v2(*db, query_buffer, -1, &create_stmt, 0);
 	if (res != SQLITE_OK) {
-		fprintf(stderr, "ERROR: Could not create entry in %s\n", category);
+		fprintf(stderr, "ERROR: Could not create entry in %s. (%s), (%s)\n", category, sqlite3_errmsg(*db), sqlite3_errstr(res));
 		return -1;
 	}
+
+	if (sqlite3_step(create_stmt) != SQLITE_OK) {
+		fprintf(stderr, "ERROR: Failed to execute INSERT statement. (%s), (%s)\n", sqlite3_errmsg(*db), sqlite3_errstr(res));
+		return -1;
+	}
+
+	sqlite3_reset(create_stmt);
+	sqlite3_finalize(create_stmt);
 
 	printf("Created entry in %s: %s\n", category, content);
 	return 0;
