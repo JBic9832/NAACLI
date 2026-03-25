@@ -27,14 +27,6 @@ typedef struct {
     const int num_arguments;
 } CLI_Info;
 
-unsigned int hash(const char *str) {
-    unsigned int hash = 5381;
-    while (*str) {
-        hash = ((hash << 5) + hash) + *str++; // hash * 33 + c
-    }
-    return hash;
-}
-
 void open_db(sqlite3** db, const char* cwd) {
 	char buffer[PATH_SIZE];
 	sprintf(buffer, "%s/notes.db", cwd);
@@ -42,7 +34,6 @@ void open_db(sqlite3** db, const char* cwd) {
 	if(res) {
 		fprintf(stderr, "ERROR: Failed to open db connection!");
 	}
-
 }
 
 int create_entry(sqlite3** db, const char* category, const char* content) {
@@ -52,8 +43,6 @@ int create_entry(sqlite3** db, const char* category, const char* content) {
 	snprintf(create_table_buffer, sizeof(create_table_buffer), "CREATE TABLE IF NOT EXISTS %s (ID INTEGER PRIMARY KEY, CONTENT TEXT NOT NULL)", category);
 
 	const char* sql = create_table_buffer;
-
-	printf("Category: %s, Content: %s\n", category, content);
 
 	char* error_message = 0;
 	res = sqlite3_exec(*db, sql, NULL, NULL, &error_message);
@@ -71,7 +60,7 @@ int create_entry(sqlite3** db, const char* category, const char* content) {
 		return -1;
 	}
 
-	if (sqlite3_step(create_stmt) != SQLITE_OK) {
+	if (sqlite3_step(create_stmt) != SQLITE_DONE) {
 		fprintf(stderr, "ERROR: Failed to execute INSERT statement. (%s), (%s)\n", sqlite3_errmsg(*db), sqlite3_errstr(res));
 		return -1;
 	}
