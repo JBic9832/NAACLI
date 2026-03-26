@@ -8,12 +8,12 @@ Notes as a Command Line Interface is a cli tool for creating notes, todos, and o
 
 # USAGE
 - Add item
-    - naacli add [category] [content]
+    - ```naacli add [category] [content]```
 
 - List all items
-    - naacli list
+    - ```naacli list```
 
 - List all items in a category
-    - naacli list [category]
+    - ```naacli list [category]```
 
 
