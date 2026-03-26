@@ -16,4 +16,7 @@ Notes as a Command Line Interface is a cli tool for creating notes, todos, and o
 - List all items in a category
     - ```naacli list [category]```
 
+NAACLI will create a notes.db file in what ever directory you run it from.
+
+I recommend that you commit your "notes.db" file with all of your code so that your notes can persist across all machines that you work on. If you do this __MAKE SURE YOU DON'T ADD SENSITIVE INFORMATION!!!__ Otherwise you can just add "notes.db" to your gitignore.
 
