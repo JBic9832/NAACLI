@@ -14,6 +14,14 @@
 #define PATH_SIZE PATH_MAX
 #endif
 
+#define AC_RED     "\x1B[31m"
+#define AC_GREEN   "\x1B[32m"
+#define AC_YELLOW  "\x1B[33m"
+#define AC_BLUE    "\x1B[34m"
+#define AC_MAGENTA "\x1B[35m"
+#define AC_CYAN    "\x1B[36m"
+#define AC_NORMAL  "\x1B[0m" // Code to reset color
+
 typedef struct {
     const char* name;
     const char* usage;
@@ -125,14 +133,34 @@ void list_all(sqlite3 **db) {
 
 	int i = 0;
 	while (sqlite3_step(table_stmt) == SQLITE_ROW) {
-		char* name = (char*)sqlite3_column_text(table_stmt, 0);
-		printf("Name from stmt: %s - %d\n", name, i);
+		char* res = (char*)sqlite3_column_text(table_stmt, 0);
+		// sqlite3_column_text returns temporary memory which is
+		// cleared after sqlite3_step meaning the strings are invalid
+		// so we must duplicate them
+		char* name = strdup((const char*)res);
 		table_names[i] = name;
 		++i;
 	}
 
+	sqlite3_stmt* stmt;
 	for (int j = 0; j < i; ++j) {
-		printf("Table %d: %s\n", j, table_names[j]);
+		char* name = strdup((const char*)table_names[j]);
+		char query[512];
+		snprintf(query, sizeof(query), "SELECT * FROM %s", name);
+		res = sqlite3_prepare_v2(*db, query, -1, &stmt, 0);
+		if (res != SQLITE_OK) {
+			fprintf(stderr, "ERROR: Failed to select items from table %s. (%s), (%s)\n", name, sqlite3_errmsg(*db), sqlite3_errstr(res));
+			return;
+		}
+
+		printf("%s%s\n%s", AC_GREEN, name, AC_NORMAL);
+		while (sqlite3_step(stmt) == SQLITE_ROW) {
+			int id = sqlite3_column_int(stmt, 0);
+			char* content = sqlite3_column_text(stmt, 1);
+			printf("\t%d: %s\n", id, content);
+		}
+
+		printf("\n");
 	}
 }
 
@@ -240,8 +268,6 @@ int main(int argc, char *argv[]) {
     #endif
 
     cwd_path = buffer;
-
-	printf("CURRENT WORKING DIR: %s\n", cwd_path);
 
     Arg arg0 = {
         "Category",
