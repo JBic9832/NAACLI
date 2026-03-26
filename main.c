@@ -72,14 +72,77 @@ int create_entry(sqlite3** db, const char* category, const char* content) {
 	return 0;
 }
 
-int handle_db_create_entry(const char* category, const char* content, const char* cwd) {
+void handle_db_create_entry(const char* category, const char* content, const char* cwd) {
 	sqlite3* db;
 	open_db(&db, cwd);
 
 	create_entry(&db, category, content);
 
 	sqlite3_close(db);
-	return 0;
+}
+
+void list_all_in_category(sqlite3** db, const char* category) {
+	char query_buffer[512];
+	snprintf(query_buffer, sizeof(query_buffer), "SELECT * FROM %s", category);
+
+	sqlite3_stmt* stmt;
+	int res = sqlite3_prepare_v2(*db, query_buffer, -1, &stmt, 0);
+	if (res != SQLITE_OK) {
+		fprintf(stderr, "ERROR: Failed to prepare statement - %s. (%s), (%s)\n", query_buffer, sqlite3_errmsg(*db), sqlite3_errstr(res));
+		return;
+	}
+
+	printf("%s:\n", category);
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		int id = sqlite3_column_int(stmt, 0);
+		const char* content = (const char*)sqlite3_column_text(stmt, 1);
+		printf("\t%d: %s\n", id, content);
+	}
+
+	sqlite3_finalize(stmt);
+}
+
+void handle_list_all_in_category(const char* category, const char* cwd) {
+	sqlite3* db;
+	open_db(&db, cwd);
+
+	list_all_in_category(&db, category);
+
+	sqlite3_close(db);
+}
+
+void list_all(sqlite3 **db) {
+	char* table_query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';";
+
+	sqlite3_stmt* table_stmt;
+	int res = sqlite3_prepare_v2(*db, table_query, -1, &table_stmt, 0);
+	if (res != SQLITE_OK) {
+		fprintf(stderr, "ERROR: Failed to get tables. (%s), (%s)", sqlite3_errmsg(*db), sqlite3_errstr(res));
+		return;
+	}
+
+	char* table_names[512];
+
+	int i = 0;
+	while (sqlite3_step(table_stmt) == SQLITE_ROW) {
+		char* name = (char*)sqlite3_column_text(table_stmt, 0);
+		printf("Name from stmt: %s - %d\n", name, i);
+		table_names[i] = name;
+		++i;
+	}
+
+	for (int j = 0; j < i; ++j) {
+		printf("Table %d: %s\n", j, table_names[j]);
+	}
+}
+
+void handle_list_all(const char* cwd) {
+	sqlite3* db;
+	open_db(&db, cwd);
+
+	list_all(&db);
+
+	sqlite3_close(db);
 }
 
 // Remove this in production
@@ -135,9 +198,11 @@ int process_input(int argc, char* argv[], const char* cwd_path, CLI_Info info) {
 	if (strcmp(argv[1], "list") == 0) {
 		// User did not specify a category
 		if (argc == 2) {
-			// Select all categories and list all notes
+			handle_list_all(cwd_path);
 			return 0;
 		}
+		const char* category = argv[2];
+		handle_list_all_in_category(category, cwd_path);
 
 		// Select rows from category and display them
 		return 0;
@@ -148,7 +213,7 @@ int process_input(int argc, char* argv[], const char* cwd_path, CLI_Info info) {
 		if (argc == 4) {
 			printf("Adding to docs: %s, %s\n", argv[2], argv[3]);
 			// create entry
-			return handle_db_create_entry(argv[2], argv[3], cwd_path);
+			handle_db_create_entry(argv[2], argv[3], cwd_path);
 		} else {
 			fprintf(stderr, "ERROR: Invalid usage!");
 			return -1;
