@@ -19,6 +19,7 @@ Notes as a Command Line Interface is a cli tool for creating notes, todos, and o
 - Delete an item
     - ```naacli delete [category] [id]```
     - ```naacli check [category] [id]```
+  
   Note there are two keywords for it. This is because it makes sense sometimes to check an item off. It is purely semantic and does not change the functionality. Note: tables are dropped when they become empty.
 
 NAACLI will create a notes.db file in what ever directory you run it from.
