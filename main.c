@@ -154,6 +154,7 @@ void list_all(sqlite3 **db) {
 		}
 
 		printf("%s%s\n%s", AC_GREEN, name, AC_NORMAL);
+		printf("%s\tID   CONTENT\n%s", AC_BLUE, AC_NORMAL);
 		while (sqlite3_step(stmt) == SQLITE_ROW) {
 			int id = sqlite3_column_int(stmt, 0);
 			char* content = sqlite3_column_text(stmt, 1);
@@ -173,11 +174,69 @@ void handle_list_all(const char* cwd) {
 	sqlite3_close(db);
 }
 
-// Remove this in production
-void debug_arguments(int argc, char* argv[]) {
-    for (int i = 0; i < argc; ++i) {
-        printf("%d: %s\n", i, argv[i]);
-    }
+bool is_table_empty(sqlite3** db, const char* table) {
+	sqlite3_stmt* stmt;
+	char query[512];
+	snprintf(query, sizeof(query), "SELECT EXISTS (SELECT 1 FROM %s);", table);
+
+	int res = sqlite3_prepare_v2(*db, query,-1, &stmt, 0);
+	if (res != SQLITE_OK) {
+		fprintf(stderr, "ERROR: Failed to compile command for table empty. (%s), (%s)", sqlite3_errmsg(*db), sqlite3_errstr(res));
+		return false;
+	}
+
+	int step_result = sqlite3_step(stmt);
+
+	if (step_result == SQLITE_ROW) {
+		int exists = sqlite3_column_int(stmt, 0);
+		sqlite3_finalize(stmt);
+		return exists == 0;
+	} else if (step_result == SQLITE_DONE) {
+		//This should not happen
+		sqlite3_finalize(stmt);
+		return true;
+	} else {
+		fprintf(stderr, "ERROR: Failed to check if table empty. (%s), (%s)", sqlite3_errmsg(*db), sqlite3_errstr(step_result));
+		return false;
+	}
+}
+
+void delete_entry(sqlite3** db, const char* table, const char* id) {
+	char query_buffer[512];
+	snprintf(query_buffer, sizeof(query_buffer), "DELETE FROM %s WHERE ID = %s", table, id);
+
+	sqlite3_stmt* stmt;
+
+	char* err = 0;
+	int res = sqlite3_exec(*db, query_buffer, NULL, NULL, &err);
+	if (res != SQLITE_OK) {
+		fprintf(stderr, "%sFailed to execute deletion. (%s), (%s)%s\n", AC_RED, sqlite3_errmsg(*db), err, AC_NORMAL);
+		return;
+	}
+
+	printf("%sDeleted #%s from %s%s\n", AC_GREEN, id, table, AC_NORMAL);
+
+	if (is_table_empty(db, table)) {
+		char buffer[256];
+		snprintf(buffer, sizeof(buffer), "DROP TABLE %s;", table);
+
+		int res = sqlite3_exec(*db, buffer, NULL, NULL, &err);
+		if (res != SQLITE_OK) {
+			fprintf(stderr, "%sFailed to execute deletion. (%s), (%s), (%s)%s\n", AC_RED, sqlite3_errmsg(*db), err, sqlite3_errstr(res), AC_NORMAL);
+			return;
+		}
+
+		printf("%sDeleted table due to being empty: \"%s\"%s\n", AC_GREEN, table, AC_NORMAL);
+	}
+}
+
+void handle_delete(const char* table, const char* id, const char* cwd) {
+	sqlite3* db;
+	open_db(&db, cwd);
+
+	delete_entry(&db, table, id);
+
+	sqlite3_close(db);
 }
 
 void print_help_screen(CLI_Info info) {
@@ -243,10 +302,27 @@ int process_input(int argc, char* argv[], const char* cwd_path, CLI_Info info) {
 			// create entry
 			handle_db_create_entry(argv[2], argv[3], cwd_path);
 		} else {
-			fprintf(stderr, "ERROR: Invalid usage!");
+			fprintf(stderr, "ERROR: Invalid usage!\n");
+			print_help_screen(info);
 			return -1;
 		}
+
+		return 0;
 	}
+
+	if (strcmp(argv[1], "delete") == 0 || strcmp(argv[1], "check") == 0) {
+		if (argc != 4) {
+			fprintf(stderr, "ERROR: Invalid usage!\n");
+			print_help_screen(info);
+			return -1;
+		}
+
+		handle_delete(argv[2], argv[3], cwd_path);
+
+		return 0;
+	}
+
+	print_help_screen(info);
 
     return 0;
 }
