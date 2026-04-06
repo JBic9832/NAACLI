@@ -125,7 +125,7 @@ void list_all(sqlite3 **db) {
 	sqlite3_stmt* table_stmt;
 	int res = sqlite3_prepare_v2(*db, table_query, -1, &table_stmt, 0);
 	if (res != SQLITE_OK) {
-		fprintf(stderr, "ERROR: Failed to get tables. (%s), (%s)", sqlite3_errmsg(*db), sqlite3_errstr(res));
+		fprintf(stderr, "ERROR: Failed to get tables. (%s), (%s)\n", sqlite3_errmsg(*db), sqlite3_errstr(res));
 		return;
 	}
 
